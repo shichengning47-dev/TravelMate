@@ -16,6 +16,18 @@ type Stop = {
   kind: string;
 };
 
+type ChatMessage = { id: number; role: "user" | "ai"; text: string };
+type ExpenseItem = { id: number; title: string; amount: number };
+type KnowledgeSource = {
+  id: number;
+  icon: string;
+  tone: string;
+  name: string;
+  description: string;
+  status: string;
+  action: string;
+};
+
 const INITIAL_STOPS: Stop[] = [
   { id: 1, time: "09:00", name: "灵隐寺", area: "西湖西侧", duration: "2小时", cost: 75, icon: "寺", note: "千年古刹与飞来峰石刻，清晨更安静。", x: 22, y: 28, kind: "文化古迹" },
   { id: 2, time: "11:40", name: "曲院风荷", area: "北山街", duration: "1小时", cost: 0, icon: "荷", note: "沿水而行，七月荷花正盛，适合慢游。", x: 45, y: 38, kind: "自然风光" },
@@ -33,17 +45,33 @@ const workflow = [
   ["06", "确认更新", "展示差异，用户确认后写入"],
 ];
 
+const INITIAL_SOURCES: KnowledgeSource[] = [
+  { id: 1, icon: "高", tone: "amap", name: "高德地点与路线", description: "POI、周边搜索、坐标、出行时间与路线距离", status: "等待 API Key · 接口已预留", action: "配置" },
+  { id: 2, icon: "册", tone: "doc", name: "杭州旅行事实库", description: "开放时间、预约方式、特色标签与建议停留时长", status: "演示数据 · 128 条", action: "查看" },
+  { id: 3, icon: "心", tone: "pref", name: "个人偏好记忆", description: "安静、当地菜、慢节奏、少排队，自动从反馈中更新", status: "已启用 · 用户可随时删除", action: "管理" },
+  { id: 4, icon: "尺", tone: "rule", name: "行程约束与保护", description: "必去、可替换、已完成、时间窗和预算上限", status: "6 条规则正在生效", action: "编辑" },
+];
+
 export default function Home() {
   const [section, setSection] = useState<"trip" | "flow" | "knowledge">("trip");
   const [selected, setSelected] = useState(2);
   const [stops, setStops] = useState(INITIAL_STOPS);
   const [day, setDay] = useState(2);
   const [chatOpen, setChatOpen] = useState(true);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [replying, setReplying] = useState(false);
   const [adjusted, setAdjusted] = useState(false);
   const [expense, setExpense] = useState(false);
   const [spent, setSpent] = useState(1220);
+  const [expenseTitle, setExpenseTitle] = useState("");
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseItems, setExpenseItems] = useState<ExpenseItem[]>([]);
   const [saved, setSaved] = useState(false);
   const [flowEnabled, setFlowEnabled] = useState([true, true, true, true, true, true]);
+  const [sources, setSources] = useState(INITIAL_SOURCES);
+  const [editingSource, setEditingSource] = useState<KnowledgeSource | null>(null);
+  const [sourceForm, setSourceForm] = useState({ name: "", description: "", status: "" });
   const current = stops.find((s) => s.id === selected) ?? stops[0];
 
   const total = useMemo(() => stops.reduce((sum, stop) => sum + stop.cost, 0), [stops]);
@@ -59,6 +87,57 @@ export default function Home() {
     );
     setSelected(4);
     setAdjusted(true);
+  }
+
+  function addExpense() {
+    const amount = Number(expenseAmount);
+    if (!expenseTitle.trim() || !Number.isFinite(amount) || amount <= 0) return;
+    setExpenseItems((items) => [{ id: Date.now(), title: expenseTitle.trim(), amount }, ...items]);
+    setSpent((value) => value + amount);
+    setExpenseTitle("");
+    setExpenseAmount("");
+    setExpense(false);
+  }
+
+  function getLocalReply(input: string) {
+    if (/吃|餐厅|饭|美食/.test(input)) return "按你当前在西湖西侧的位置，建议优先找步行 15 分钟内的杭帮菜。真实高德接口接入后，我会列出距离、评分和人均消费；目前先保留知味观，并预留 90 分钟用餐。";
+    if (/天气|下雨|雨|热|高温/.test(input)) return "当前演示天气为“阵雨转阴”。建议把室外的茅家埠放到 16:10，午后阵雨时先用餐或进入室内。接入逐小时天气后，我会自动按未来 2—4 小时更新建议。";
+    if (/预算|花|消费|记账/.test(input)) return `目前已记录 ¥${spent.toLocaleString()}，剩余 ¥${(3600 - spent).toLocaleString()}。你可以点击“记一笔”，输入消费事项和金额，我会立即更新预算。`;
+    if (/不想|替换|换|人多|安静/.test(input)) return "我会遵守“最小改动”规则：只调整你指定的景点，保持已经完成、午餐和晚间安排不变。你可以告诉我想换掉哪个地点，以及更看重安静、距离还是景色。";
+    return "收到。我已经把这条需求加入当前行程上下文。现在是本地交互模式；接入千问后，我会结合知识库、高德路线、预算和天气生成可执行的局部调整方案。";
+  }
+
+  function sendMessage(text = chatInput) {
+    const clean = text.trim();
+    if (!clean || replying) return;
+    const userMessage: ChatMessage = { id: Date.now(), role: "user", text: clean };
+    setChatMessages((messages) => [...messages, userMessage]);
+    setChatInput("");
+    setReplying(true);
+    window.setTimeout(() => {
+      setChatMessages((messages) => [...messages, { id: Date.now() + 1, role: "ai", text: getLocalReply(clean) }]);
+      setReplying(false);
+    }, 450);
+  }
+
+  function openSource(source?: KnowledgeSource) {
+    if (source) {
+      setEditingSource(source);
+      setSourceForm({ name: source.name, description: source.description, status: source.status });
+    } else {
+      setEditingSource({ id: 0, icon: "＋", tone: "rule", name: "", description: "", status: "", action: "编辑" });
+      setSourceForm({ name: "", description: "", status: "手动添加 · 本地资料" });
+    }
+  }
+
+  function saveSource() {
+    if (!editingSource || !sourceForm.name.trim()) return;
+    if (editingSource.id === 0) {
+      setSources((items) => [...items, { ...editingSource, id: Date.now(), name: sourceForm.name.trim(), description: sourceForm.description.trim() || "用户添加的旅行资料", status: sourceForm.status.trim(), icon: "资" }]);
+    } else {
+      setSources((items) => items.map((item) => item.id === editingSource.id ? { ...item, ...sourceForm } : item));
+    }
+    setEditingSource(null);
   }
 
   return (
@@ -130,9 +209,15 @@ export default function Home() {
               <div className="bar"><i style={{ width: `${Math.min(100, (spent / 3600) * 100)}%` }} /></div>
               <div className="budget-foot"><span>剩余 ¥{(3600 - spent).toLocaleString()}</span><button onClick={() => setExpense(!expense)}>＋ 记一笔</button></div>
               {expense && (
-                <div className="expense-row">
-                  <span>午餐 · ¥88</span>
-                  <button onClick={() => { setSpent((v) => v + 88); setExpense(false); }}>确认记录</button>
+                <div className="expense-form">
+                  <label>消费事项<input value={expenseTitle} onChange={(event) => setExpenseTitle(event.target.value)} placeholder="例如：午餐、门票、打车" /></label>
+                  <label>金额（元）<input value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="0.00" onKeyDown={(event) => event.key === "Enter" && addExpense()} /></label>
+                  <div><button className="cancel-expense" onClick={() => setExpense(false)}>取消</button><button className="confirm-expense" disabled={!expenseTitle.trim() || !Number(expenseAmount)} onClick={addExpense}>确认记录</button></div>
+                </div>
+              )}
+              {expenseItems.length > 0 && (
+                <div className="expense-list">
+                  {expenseItems.slice(0, 3).map((item) => <div key={item.id}><span>{item.title}</span><strong>− ¥{item.amount.toFixed(2)}</strong></div>)}
                 </div>
               )}
             </div>
@@ -195,9 +280,20 @@ export default function Home() {
                 <div className="change-preview"><span>仅 1 处变化</span><del>15:00 苏堤春晓</del><ins>16:10 茅家埠</ins><small>午餐与晚上的河坊街保持不变</small></div>
                 <button className={adjusted ? "applied" : "apply"} onClick={applyAdjustment}>{adjusted ? "✓ 已更新行程" : "应用这次调整"}</button>
               </div>
+              {chatMessages.map((message) => (
+                <div key={message.id} className={`msg ${message.role}`}>{message.text}</div>
+              ))}
+              {replying && <div className="msg ai typing"><span /><span /><span /></div>}
             </div>
-            <div className="suggestions"><button>附近吃什么？</button><button>记录消费</button><button>根据天气调整</button></div>
-            <div className="composer"><input aria-label="向随行 Agent 提问" placeholder="告诉我你的临时想法…" /><button aria-label="发送">↑</button></div>
+            <div className="suggestions">
+              <button onClick={() => sendMessage("附近吃什么？")}>附近吃什么？</button>
+              <button onClick={() => { setExpense(true); setChatOpen(false); }}>记录消费</button>
+              <button onClick={() => sendMessage("根据天气调整接下来的行程")}>根据天气调整</button>
+            </div>
+            <div className="composer">
+              <input aria-label="向随行 Agent 提问" value={chatInput} onChange={(event) => setChatInput(event.target.value)} onKeyDown={(event) => event.key === "Enter" && sendMessage()} placeholder="告诉我你的临时想法…" />
+              <button aria-label="发送" disabled={!chatInput.trim() || replying} onClick={() => sendMessage()}>↑</button>
+            </div>
             <div className="minimal-rule">已启用「最小改动」保护 · 今日预计 ¥{total}</div>
           </aside>
         </div>
@@ -238,21 +334,40 @@ export default function Home() {
         <section className="knowledge">
           <div className="studio-head">
             <div><p className="eyebrow">Agent 的可靠依据</p><h1>旅行知识库</h1><p>把事实、偏好和约束分开保存，避免 Agent 凭感觉重写路线。</p></div>
-            <button className="add-source">＋ 添加资料</button>
+            <button className="add-source" onClick={() => openSource()}>＋ 添加资料</button>
           </div>
           <div className="knowledge-stats">
             <div><small>景点与餐厅</small><strong>1,284</strong><span>高德地点数据</span></div>
-            <div><small>旅行规则</small><strong>36</strong><span>营业与预约提醒</span></div>
+            <div><small>旅行规则</small><strong>{32 + sources.length}</strong><span>营业与预约提醒</span></div>
             <div><small>你的偏好</small><strong>12</strong><span>随反馈持续更新</span></div>
             <div><small>行程记忆</small><strong>8</strong><span>本次旅行的变化</span></div>
           </div>
           <div className="source-grid">
-            <article><span className="source-icon amap">高</span><div><h3>高德地点与路线</h3><p>POI、周边搜索、坐标、出行时间与路线距离</p><small>等待 API Key · 接口已预留</small></div><button>配置</button></article>
-            <article><span className="source-icon doc">册</span><div><h3>杭州旅行事实库</h3><p>开放时间、预约方式、特色标签与建议停留时长</p><small>演示数据 · 128 条</small></div><button>查看</button></article>
-            <article><span className="source-icon pref">心</span><div><h3>个人偏好记忆</h3><p>安静、当地菜、慢节奏、少排队，自动从反馈中更新</p><small>已启用 · 用户可随时删除</small></div><button>管理</button></article>
-            <article><span className="source-icon rule">尺</span><div><h3>行程约束与保护</h3><p>必去、可替换、已完成、时间窗和预算上限</p><small>6 条规则正在生效</small></div><button>编辑</button></article>
+            {sources.map((source) => (
+              <article key={source.id}>
+                <span className={`source-icon ${source.tone}`}>{source.icon}</span>
+                <div><h3>{source.name}</h3><p>{source.description}</p><small>{source.status}</small></div>
+                <button onClick={() => openSource(source)}>{source.action}</button>
+              </article>
+            ))}
           </div>
           <div className="knowledge-note"><span>✦</span><div><strong>知识库如何参与一次调整？</strong><p>Agent 先理解你的意图，再用知识库筛选真实候选，随后调用地图计算路程，最后由规则引擎只生成必要的行程补丁。</p></div></div>
+          {editingSource && (
+            <div className="modal-backdrop" role="presentation" onMouseDown={() => setEditingSource(null)}>
+              <div className="source-modal" role="dialog" aria-modal="true" aria-label={editingSource.id === 0 ? "添加资料" : "编辑资料"} onMouseDown={(event) => event.stopPropagation()}>
+                <div className="modal-head"><div><p className="eyebrow">旅行知识库</p><h2>{editingSource.id === 0 ? "添加一份资料" : "查看与编辑"}</h2></div><button onClick={() => setEditingSource(null)}>×</button></div>
+                <label>资料名称<input autoFocus value={sourceForm.name} onChange={(event) => setSourceForm((form) => ({ ...form, name: event.target.value }))} placeholder="例如：杭州小众景点清单" /></label>
+                <label>内容说明<textarea value={sourceForm.description} onChange={(event) => setSourceForm((form) => ({ ...form, description: event.target.value }))} placeholder="填写资料内容、适用场景或来源说明" /></label>
+                <label>状态或备注<input value={sourceForm.status} onChange={(event) => setSourceForm((form) => ({ ...form, status: event.target.value }))} placeholder="例如：手动整理 · 20 条" /></label>
+                <div className="modal-actions">
+                  {editingSource.id !== 0 && <button className="delete-source" onClick={() => { setSources((items) => items.filter((item) => item.id !== editingSource.id)); setEditingSource(null); }}>删除资料</button>}
+                  <button className="secondary" onClick={() => setEditingSource(null)}>取消</button>
+                  <button className="primary" disabled={!sourceForm.name.trim()} onClick={saveSource}>保存资料</button>
+                </div>
+                <p className="modal-hint">当前保存在本次浏览器会话中；接入数据库后会同步到账号知识库。</p>
+              </div>
+            </div>
+          )}
         </section>
       )}
     </main>
