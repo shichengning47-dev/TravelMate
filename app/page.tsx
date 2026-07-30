@@ -47,9 +47,9 @@ const workflow = [
 
 const INITIAL_SOURCES: KnowledgeSource[] = [
   { id: 1, icon: "高", tone: "amap", name: "高德地点与路线", description: "POI、周边搜索、坐标、出行时间与路线距离", status: "等待 API Key · 接口已预留", action: "配置" },
-  { id: 2, icon: "册", tone: "doc", name: "杭州旅行事实库", description: "开放时间、预约方式、特色标签与建议停留时长", status: "演示数据 · 128 条", action: "查看" },
-  { id: 3, icon: "心", tone: "pref", name: "个人偏好记忆", description: "安静、当地菜、慢节奏、少排队，自动从反馈中更新", status: "已启用 · 用户可随时删除", action: "管理" },
-  { id: 4, icon: "尺", tone: "rule", name: "行程约束与保护", description: "必去、可替换、已完成、时间窗和预算上限", status: "6 条规则正在生效", action: "编辑" },
+  { id: 2, icon: "册", tone: "doc", name: "全国目的地事实资料", description: "按旅程保存开放时间、预约方式、特色标签、来源和更新时间", status: "当前 1 个演示目的地 · 未接实时数据", action: "查看" },
+  { id: 3, icon: "心", tone: "pref", name: "个人偏好记忆", description: "安静、当地菜、慢节奏、少排队；Agent 推断的新偏好需经你确认", status: "4 个演示偏好 · 可编辑或删除", action: "管理" },
+  { id: 4, icon: "尺", tone: "rule", name: "行程约束与保护", description: "平台安全规则、用户自定规则和本次行程约束分层保存", status: "4 条可见规则 · 来源清晰", action: "编辑" },
 ];
 
 export default function Home() {
@@ -72,6 +72,7 @@ export default function Home() {
   const [sources, setSources] = useState(INITIAL_SOURCES);
   const [editingSource, setEditingSource] = useState<KnowledgeSource | null>(null);
   const [sourceForm, setSourceForm] = useState({ name: "", description: "", status: "" });
+  const [shareNotice, setShareNotice] = useState("");
   const current = stops.find((s) => s.id === selected) ?? stops[0];
 
   const total = useMemo(() => stops.reduce((sum, stop) => sum + stop.cost, 0), [stops]);
@@ -107,17 +108,43 @@ export default function Home() {
     return "收到。我已经把这条需求加入当前行程上下文。现在是本地交互模式；接入千问后，我会结合知识库、高德路线、预算和天气生成可执行的局部调整方案。";
   }
 
-  function sendMessage(text = chatInput) {
+  async function sendMessage(text = chatInput) {
     const clean = text.trim();
     if (!clean || replying) return;
     const userMessage: ChatMessage = { id: Date.now(), role: "user", text: clean };
     setChatMessages((messages) => [...messages, userMessage]);
     setChatInput("");
     setReplying(true);
-    window.setTimeout(() => {
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
+    try {
+      if (!apiBase) throw new Error("local-mode");
+      const response = await fetch(`${apiBase}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thread_id: "demo-hangzhou", message: clean, location: "杭州西湖", budget_remaining: 3600 - spent }),
+      });
+      if (!response.ok) throw new Error("api-unavailable");
+      const data = await response.json();
+      setChatMessages((messages) => [...messages, { id: Date.now() + 1, role: "ai", text: data.reply }]);
+    } catch {
       setChatMessages((messages) => [...messages, { id: Date.now() + 1, role: "ai", text: getLocalReply(clean) }]);
+    } finally {
       setReplying(false);
-    }, 450);
+    }
+  }
+
+  async function shareArchive() {
+    const data = { title: "杭州三日漫游 · 旅行档案", text: "这是我在行迹生成的杭州旅行档案。", url: window.location.href };
+    try {
+      if (navigator.share) await navigator.share(data);
+      else {
+        await navigator.clipboard.writeText(`${data.title}\n${data.url}`);
+        setShareNotice("分享链接已复制，可粘贴给微信好友");
+        window.setTimeout(() => setShareNotice(""), 2500);
+      }
+    } catch {
+      setShareNotice("已取消分享");
+    }
   }
 
   function openSource(source?: KnowledgeSource) {
@@ -337,11 +364,18 @@ export default function Home() {
             <button className="add-source" onClick={() => openSource()}>＋ 添加资料</button>
           </div>
           <div className="knowledge-stats">
-            <div><small>景点与餐厅</small><strong>1,284</strong><span>高德地点数据</span></div>
-            <div><small>旅行规则</small><strong>{32 + sources.length}</strong><span>营业与预约提醒</span></div>
-            <div><small>你的偏好</small><strong>12</strong><span>随反馈持续更新</span></div>
-            <div><small>行程记忆</small><strong>8</strong><span>本次旅行的变化</span></div>
+            <div><small>实时地点数据</small><strong>未连接</strong><span>接入高德后显示真实查询数</span></div>
+            <div><small>可见保护规则</small><strong>4</strong><span>平台 1 · 用户 2 · 行程 1</span></div>
+            <div><small>已确认偏好</small><strong>4</strong><span>当前均为演示偏好</span></div>
+            <div><small>旅行档案</small><strong>1</strong><span>演示 1 · 真实 0</span></div>
           </div>
+          <div className="archive-heading"><p className="eyebrow">按旅程沉淀，而不是按城市写死</p><h2>我的旅行档案</h2><p>旅行结束后，将真实路线、消费、反馈和已核验地点整理成可分享的档案。</p></div>
+          <div className="archive-grid">
+            <article className="archive-card"><div><span className="demo-badge">演示档案</span><h3>杭州三日漫游</h3><p>5 个地点 · 1 次局部调整 · 当前预算记录 ¥{spent.toLocaleString()}</p><small>接入账号数据库后才会永久保存</small></div><button onClick={shareArchive}>分享给好友</button></article>
+            <article className="archive-card empty"><div><h3>下一次旅行会出现在这里</h3><p>支持全国目的地，每段旅行独立生成事实与记忆。</p></div></article>
+          </div>
+          {shareNotice && <div className="share-notice">{shareNotice}</div>}
+          <div className="archive-heading"><p className="eyebrow">Agent 的数据来源</p><h2>知识与规则</h2></div>
           <div className="source-grid">
             {sources.map((source) => (
               <article key={source.id}>
