@@ -70,6 +70,18 @@ nav button.active::after { content: ""; height: 3px; background: var(--bright); 
 .budget-foot button { border: 0; color: var(--green); background: none; font-size: 10px; cursor: pointer; }
 .expense-row { display: flex; justify-content: space-between; align-items: center; margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--line); font-size: 10px; }
 .expense-row button { border: 0; background: var(--green); color: white; border-radius: 10px; padding: 4px 8px; cursor: pointer; }
+.expense-form { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); display: grid; grid-template-columns: 1.4fr .8fr; gap: 8px; }
+.expense-form label { display: grid; gap: 4px; font-size: 8px; color: #65736b; }
+.expense-form input { width: 100%; min-width: 0; border: 1px solid var(--line); background: #faf9f5; border-radius: 7px; padding: 7px 8px; font-size: 10px; outline: none; }
+.expense-form input:focus { border-color: var(--green); box-shadow: 0 0 0 2px rgba(30,106,85,.09); }
+.expense-form > div { grid-column: 1/-1; display: flex; justify-content: flex-end; gap: 6px; }
+.expense-form button { border: 0; border-radius: 8px; padding: 6px 10px; font-size: 9px; cursor: pointer; }
+.cancel-expense { background: transparent; color: #758078; }
+.confirm-expense { background: var(--green); color: white; }
+.confirm-expense:disabled { opacity: .4; cursor: not-allowed; }
+.expense-list { border-top: 1px solid var(--line); margin-top: 9px; padding-top: 4px; }
+.expense-list div { display: flex; justify-content: space-between; padding: 5px 0; font-size: 9px; }
+.expense-list strong { color: var(--bright); font-weight: 600; }
 .other-day { padding: 20px 0; }
 .other-day span { color: var(--bright); font-size: 11px; }
 .other-day h2 { font-family: serif; font-size: 22px; margin: 8px 0; }
@@ -133,6 +145,10 @@ nav button.active::after { content: ""; height: 3px; background: var(--bright); 
 .msg.ai { padding-left: 30px; position: relative; }
 .msg.ai::before { content: "✦"; position: absolute; left: 0; top: 2px; color: var(--bright); font-size: 17px; }
 .msg.ai p { margin: 0 0 8px; }
+.msg.typing { display: flex; align-items: center; gap: 4px; padding-top: 5px; min-height: 22px; }
+.msg.typing span { width: 5px; height: 5px; border-radius: 50%; background: var(--green); animation: typingPulse 1s infinite alternate; }
+.msg.typing span:nth-child(2) { animation-delay: .18s; }.msg.typing span:nth-child(3) { animation-delay: .36s; }
+@keyframes typingPulse { to { opacity: .25; transform: translateY(-3px); } }
 .change-preview { border-left: 2px solid var(--bright); background: #fffdf8; padding: 9px 10px; border-radius: 0 8px 8px 0; display: grid; gap: 4px; }
 .change-preview span { color: var(--bright); font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .change-preview del { color: #89948d; font-size: 10px; }
@@ -145,6 +161,7 @@ nav button.active::after { content: ""; height: 3px; background: var(--bright); 
 .composer { display: grid; grid-template-columns: 1fr 32px; gap: 6px; padding: 8px 14px; }
 .composer input { min-width: 0; border: 1px solid var(--line); background: white; border-radius: 17px; padding: 8px 12px; font-size: 10px; outline: none; }
 .composer button { border: 0; background: var(--bright); color: white; border-radius: 50%; cursor: pointer; }
+.composer button:disabled { opacity: .35; cursor: not-allowed; }
 .minimal-rule { font-size: 8px; color: #87928a; text-align: center; padding: 0 0 10px; }
 
 .studio, .knowledge { min-height: calc(100vh - 70px); padding: 45px max(5vw, 40px); background: #f6f2e9; }
@@ -194,6 +211,20 @@ nav button.active::after { content: ""; height: 3px; background: var(--bright); 
 .knowledge-note > span { font-size: 24px; color: #f2b190; }
 .knowledge-note strong { font: 800 13px serif; }
 .knowledge-note p { margin: 4px 0 0; color: #cbd9d3; font-size: 9px; }
+.modal-backdrop { position: fixed; z-index: 100; inset: 0; background: rgba(13,36,29,.46); backdrop-filter: blur(4px); display: grid; place-items: center; padding: 18px; }
+.source-modal { width: min(520px, 100%); background: #fffdf8; border-radius: 17px; padding: 22px; box-shadow: 0 24px 80px rgba(18,52,41,.28); }
+.modal-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
+.modal-head h2 { margin: 0; font: 800 23px "STSong", serif; }
+.modal-head > button { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: white; cursor: pointer; font-size: 17px; }
+.source-modal > label { display: grid; gap: 6px; margin-top: 13px; font-size: 10px; font-weight: 700; }
+.source-modal input, .source-modal textarea { width: 100%; border: 1px solid var(--line); background: #f8f6ef; border-radius: 9px; padding: 10px 11px; outline: none; font-size: 11px; resize: vertical; }
+.source-modal textarea { min-height: 90px; line-height: 1.6; }
+.source-modal input:focus, .source-modal textarea:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(30,106,85,.09); }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.modal-actions button { border: 0; border-radius: 9px; padding: 9px 14px; font-size: 10px; cursor: pointer; }
+.modal-actions .primary { background: var(--ink); color: white; }.modal-actions .primary:disabled { opacity: .35; cursor: not-allowed; }
+.modal-actions .secondary { background: #ebece7; }.modal-actions .delete-source { margin-right: auto; background: #f9e6df; color: #a84935; }
+.modal-hint { text-align: center; color: #89928c; font-size: 8px; margin: 12px 0 0; }
 
 @media (max-width: 1180px) {
   .trip-shell { grid-template-columns: 300px 1fr; }
