@@ -8,6 +8,10 @@
   --line: rgba(24, 60, 49, .13);
 }
 
+.archive-heading{margin:30px 0 14px}.archive-heading h2{margin:3px 0 4px;font-family:Georgia,serif;font-size:28px;color:#163f35}.archive-heading p{margin:0;color:#738079}
+.archive-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:22px}.archive-card{background:#fffdf8;border:1px solid #dfe4dc;border-radius:18px;padding:22px;display:flex;align-items:center;justify-content:space-between;gap:18px}.archive-card h3{font-size:22px;margin:8px 0}.archive-card p{color:#6f7d76;margin:0 0 8px}.archive-card small{color:#8a948e}.archive-card button{border:0;border-radius:12px;background:#174c3d;color:#fff;padding:12px 18px;white-space:nowrap}.archive-card.empty{border-style:dashed;background:transparent}.demo-badge{display:inline-block;background:#fff0e7;color:#d7593c;border-radius:999px;padding:5px 9px;font-size:11px}.share-notice{position:fixed;right:28px;bottom:28px;z-index:80;background:#153f35;color:#fff;border-radius:12px;padding:14px 18px;box-shadow:0 12px 30px #1234}
+@media(max-width:900px){.archive-grid{grid-template-columns:1fr}}
+
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: var(--paper); color: var(--ink); }
 body { font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif; }
